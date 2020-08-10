@@ -66,6 +66,7 @@ typedef struct CCMove {
     uint32_t depth;
     uint32_t original_rank;
     int32_t evaluation_result;
+    int32_t evaluation_diff;
 } CCMove;
 
 typedef struct CCOptions {
@@ -225,6 +226,21 @@ CCBotPollStatus cc_block_next_move(
     CCMove *move,
     CCPlanPlacement* plan,
     uint32_t *plan_length
+);
+
+CCBotPollStatus cc_query_next_move(
+    CCAsyncBot *bot,
+    unsigned char x[4],
+    unsigned char y[4],
+    CCMove *move,
+    CCPlanPlacement* plan,
+    uint32_t *plan_length
+);
+
+CCBotPollStatus cc_advance_move(
+    CCAsyncBot *bot,
+    unsigned char x[4],
+    unsigned char y[4]
 );
 
 /* Returns the default options in the options parameter */

@@ -45,7 +45,9 @@ enum BotMsg {
     },
     NewPiece(Piece),
     NextMove(u32),
-    ForceAnalysisLine(Vec<FallingPiece>)
+    ForceAnalysisLine(Vec<FallingPiece>),
+    QueryNextMove([(i32, i32); 4]),
+    AdvanceMove([(i32, i32); 4])
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -54,6 +56,7 @@ pub struct Info {
     pub depth: u32,
     pub original_rank: u32,
     pub evaluation_result: i32,
+    pub evaluation_diff: i32,
     pub plan: Vec<(FallingPiece, LockResult)>
 }
 

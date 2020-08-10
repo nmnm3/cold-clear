@@ -68,6 +68,25 @@ impl Interface {
         self.recv.recv().ok()
     }
 
+    pub fn query_next_move(&self, x: &[u8; 4], y: &[u8; 4]) -> Option<(Move, Info)> {
+        let mut location = [(0, 0); 4];
+        for i in 0..4 {
+            location[i].0 = x[i] as i32;
+            location[i].1 = y[i] as i32;
+        }
+        self.send.send(BotMsg::QueryNextMove(location)).ok();
+        self.recv.recv().ok()
+    }
+
+    pub fn advance_move(&self, x: &[u8; 4], y: &[u8; 4]) {
+        let mut location = [(0, 0); 4];
+        for i in 0..4 {
+            location[i].0 = x[i] as i32;
+            location[i].1 = y[i] as i32;
+        }
+        self.send.send(BotMsg::AdvanceMove(location)).ok();
+    }
+
     /// Adds a new piece to the end of the queue.
     /// 
     /// If speculation is enabled, the piece *must* be in the bag. For example, if in the current
@@ -120,6 +139,8 @@ fn run(
             }
             Ok(BotMsg::NextMove(_)) => {}
             Ok(BotMsg::ForceAnalysisLine(_)) => {}
+            Ok(BotMsg::QueryNextMove(_)) => {}
+            Ok(BotMsg::AdvanceMove(_)) => {}
         }
     }
 

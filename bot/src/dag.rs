@@ -542,6 +542,39 @@ impl<E: Evaluation<R> + 'static, R: Clone + 'static> DagState<E, R> {
         self.generations.push_back(rented::Generation::known(piece));
     }
 
+    pub fn get_move_plan(&self, mv: FallingPiece) -> Vec<(FallingPiece, LockResult)> {
+        let mut plan = vec![];
+        let mut board = self.board.clone();
+        let mut node = self.generations[0].rent(|gen|
+            if let Children::Known(_, children) = &gen.children {
+                children[self.root as usize].as_ref().and_then(
+                    |children| children.iter().find(|c| c.placement == mv)
+                ).map(|c| {
+                    plan.push((c.placement, advance(&mut board, c.placement)));
+                    c.node
+                })
+            } else {
+                None
+            }
+        ).expect("An invalid move was chosen");
+
+        for gen in self.generations.iter().skip(1) {
+            let done = gen.rent(|gen| match &gen.children {
+                Children::Known(_, c) => match c[node as usize].as_ref().and_then(|c| c.first()) {
+                    Some(child) => {
+                        plan.push((child.placement, advance(&mut board, child.placement)));
+                        node = child.node;
+                        false
+                    }
+                    None => true
+                }
+                _ => true
+            });
+            if done { break }
+        }
+        plan
+    }
+
     pub fn get_plan(&self) -> Vec<(FallingPiece, LockResult)> {
         let mut node = self.root;
         let mut plan = vec![];

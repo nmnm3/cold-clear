@@ -29,7 +29,9 @@ pub(crate) struct ModeSwitchedBot<E: Evaluator> {
     mode: Mode<E>,
     options: Options,
     board: Board,
-    do_move: Option<u32>
+    do_move: Option<u32>,
+    query_move: Option<[(i32, i32); 4]>,
+    advance_move: Option<[(i32, i32); 4]>,
 }
 
 impl<E: Evaluator> ModeSwitchedBot<E> {
@@ -46,7 +48,9 @@ impl<E: Evaluator> ModeSwitchedBot<E> {
         };
         ModeSwitchedBot {
             mode, options, board,
-            do_move: None
+            do_move: None,
+            query_move: None,
+            advance_move: None,
         }
     }
 
@@ -99,6 +103,8 @@ impl<E: Evaluator> ModeSwitchedBot<E> {
                 }
             }
             BotMsg::NextMove(incoming) => self.do_move = Some(incoming),
+            BotMsg::QueryNextMove(location) => self.query_move = Some(location),
+            BotMsg::AdvanceMove(location) => self.advance_move = Some(location),
             BotMsg::ForceAnalysisLine(path) => match &mut self.mode {
                 Mode::Normal(bot) => bot.force_analysis_line(path),
                 _ => {}
@@ -106,9 +112,9 @@ impl<E: Evaluator> ModeSwitchedBot<E> {
         }
     }
 
-    pub fn think(&mut self, eval: &E, send_move: impl FnOnce(Move, Info)) -> Vec<Task> {
+    pub fn think(&mut self, eval: &E, send_move: impl Fn(Move, Info)) -> Vec<Task> {
         let board = &mut self.board;
-        let send_move = |mv: Move, info| {
+        let send_move_advance = |mv: Move, info| {
             let next = board.advance_queue().unwrap();
             if mv.hold {
                 if board.hold(next).is_none() {
@@ -121,7 +127,7 @@ impl<E: Evaluator> ModeSwitchedBot<E> {
         match &mut self.mode {
             Mode::Normal(bot) => {
                 if let Some(incoming) = self.do_move {
-                    if bot.next_move(eval, incoming, send_move) {
+                    if bot.next_move(eval, incoming, send_move_advance) {
                         self.do_move = None;
                         #[cfg(not(target_arch = "wasm32"))] {
                             if self.options.pcloop && can_pc_loop(board, self.options.use_hold) {
@@ -133,6 +139,17 @@ impl<E: Evaluator> ModeSwitchedBot<E> {
                             }
                         }
                     }
+                }
+
+                if let Some(location) = self.query_move {
+                    if bot.query_move(eval, &location, send_move) {
+                        self.query_move = None;
+                    }
+                }
+
+                if let Some(location) = self.advance_move {
+                    bot.advance_move(&location);
+                    self.advance_move = None;
                 }
 
                 let mut thinks = vec![];

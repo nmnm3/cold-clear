@@ -130,6 +130,12 @@ impl FallingPiece {
         self.rotate(target, board)
     }
 
+    pub fn same_location2(&self, other: &[(i32, i32); 4]) -> bool {
+        let mut self_cells = self.cells();
+        self_cells.sort();
+        self_cells == *other
+    }
+
     pub fn same_location(&self, other: &Self) -> bool {
         let mut self_cells = self.cells();
         self_cells.sort();

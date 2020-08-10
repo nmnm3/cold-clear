@@ -99,6 +99,7 @@ struct CCMove {
     depth: u32,
     original_rank: u32,
     evaluation_result: i32,
+    evaluation_diff: i32,
 }
 
 #[repr(C)]
@@ -327,6 +328,7 @@ fn convert(m: cold_clear::Move, info: cold_clear::Info) -> CCMove {
         depth: info.depth as u32,
         original_rank: info.original_rank as u32,
         evaluation_result: info.evaluation_result,
+        evaluation_diff: info.evaluation_diff,
     }
 }
 
@@ -363,6 +365,32 @@ extern "C" fn cc_block_next_move(
         }
         None => CCBotPollStatus::CC_BOT_DEAD,
     }
+}
+
+#[no_mangle]
+extern "C" fn cc_query_next_move(
+    bot: &mut CCAsyncBot,
+    x: &[u8; 4], y: &[u8; 4],
+    mv: *mut CCMove,
+    plan: *mut MaybeUninit<CCPlanPlacement>,
+    plan_length: *mut u32
+) -> CCBotPollStatus {
+    match bot.query_next_move(x, y) {
+        Some((m, info)) => {
+            convert_plan(&info, plan, plan_length);
+            unsafe { mv.write(convert(m, info)) };
+            CCBotPollStatus::CC_MOVE_PROVIDED
+        }
+        None => CCBotPollStatus::CC_BOT_DEAD,
+    }
+}
+
+#[no_mangle]
+extern "C" fn cc_advance_move(
+    bot: &mut CCAsyncBot,
+    x: &[u8; 4], y: &[u8; 4]
+) {
+    bot.advance_move(x, y);
 }
 
 #[no_mangle]

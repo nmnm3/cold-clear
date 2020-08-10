@@ -11,7 +11,7 @@ pub struct BotState<E: Evaluator> {
     tree: DagState<E::Value, E::Reward>,
     options: Options,
     forced_analysis_lines: Vec<Vec<FallingPiece>>,
-    pub outstanding_thinks: u32
+    pub outstanding_thinks: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -34,7 +34,7 @@ impl<E: Evaluator> BotState<E> {
             tree: DagState::new(board, options.use_hold),
             options,
             forced_analysis_lines: vec![],
-            outstanding_thinks: 0
+            outstanding_thinks: 0,
         }
     }
 
@@ -102,6 +102,73 @@ impl<E: Evaluator> BotState<E> {
         self.tree.nodes() > self.options.min_nodes && self.forced_analysis_lines.is_empty()
     }
 
+    pub fn advance_move(&mut self, location: &[(i32, i32); 4]) -> bool {
+        if !self.min_thinking_reached() {
+            return false
+        }
+
+        let candidates = self.tree.get_next_candidates();
+        if candidates.is_empty() {
+            return false
+        }
+
+        let mut sorted_location = *location;
+        sorted_location.sort();
+        for cand in candidates {
+            if cand.mv.same_location2(&sorted_location) {
+                self.tree.advance_move(cand.mv);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn query_move(&self, eval: &E, location: &[(i32, i32); 4], f: impl Fn(Move, Info)) -> bool {
+        if !self.min_thinking_reached() {
+            return false
+        }
+
+        let candidates = self.tree.get_next_candidates();
+        if candidates.is_empty() {
+            return false
+        }
+        let best_eval = eval.get_result(&candidates.first().unwrap().evaluation);
+
+        let mut sorted_location = *location;
+        sorted_location.sort();
+        for cand in candidates {
+            let mv = cand.mv;
+            if mv.same_location2(&sorted_location) {
+                let inputs = crate::moves::find_moves(
+                    self.tree.board(),
+                    self.options.spawn_rule.spawn(mv.kind.0, self.tree.board()).unwrap(),
+                    self.options.mode
+                ).into_iter().find(|p| p.location == mv).unwrap().inputs;
+
+                let mvc = Move {
+                    hold: cand.hold,
+                    inputs: inputs.movements,
+                    expected_location: mv,
+                };
+                let plan = self.tree.get_move_plan(mv);
+                let cand_eval = eval.get_result(&cand.evaluation);
+                let infoc = Info {
+                    nodes: self.tree.nodes(),
+                    depth: self.tree.depth(),
+                    original_rank: cand.original_rank,
+                    evaluation_result: cand_eval,
+                    evaluation_diff: cand_eval - best_eval,
+                    plan: plan,
+                };
+                f(mvc, infoc);
+                return true
+            }
+        }
+
+        false
+    }
+
     pub fn next_move(&mut self, eval: &E, incoming: u32, f: impl FnOnce(Move, Info)) -> bool {
         if !self.min_thinking_reached() {
             return false
@@ -120,6 +187,7 @@ impl<E: Evaluator> BotState<E> {
             depth: self.tree.depth() as u32,
             original_rank: child.original_rank,
             evaluation_result: eval.get_result(&child.evaluation),
+            evaluation_diff: 0,
             plan,
         };
 
